@@ -1,8 +1,8 @@
 {
-  "name": "hooker",
+  "name": "piranha",
   "version": "1.0.0",
   "main": "index.js",
-  "repository": "https://github.com/bjemo1/hooker.git",
+  "repository": "https://github.com/bjemo1/piranha.git",
   "author": "bjemo1 <brianemo37@yahoo.com>",
   "license": "MIT",
   "scripts": {
