@@ -1,7 +1,7 @@
+import bodyParser from 'body-parser';
 import express, { Application } from 'express';
-import bodyParser from 'body-parser'
-import { setupClient, getTransactions } from './plaidService';
-import { insertTransactions, deleteTransactions } from './dbService';
+import { deleteTransactions, insertTransactions, runRules } from './dbService';
+import { getTransactions, setupClient } from './plaidService';
 
 setupClient();
 
@@ -14,6 +14,8 @@ app.post("*", async (req, res) => {
         if (req.body.webhook_code === 'DEFAULT_UPDATE') {
             const transactions = await getTransactions();
             await insertTransactions(transactions);
+
+            await runRules();
         } else if (req.body.webhook_code === 'TRANSACTIONS_REMOVED') {
             const { removed_transactions } = req.body;
             await deleteTransactions(removed_transactions);

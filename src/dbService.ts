@@ -47,3 +47,19 @@ export async function deleteTransactions(transactionIds: string[]): Promise<void
         values: [transactionIds]
     });
 }
+
+
+export async function runRules(): Promise<void> {
+    const pool = await dbPool();
+
+    await pool.query(`
+        update transaction t
+                inner join rule r on lower(t.name) like lower(concat('%', r.check, '%'))
+                inner join budget_item bi on r.category_id = bi.category_id
+                inner join budget b on bi.budget_id = b.budget_id
+        set t.budget_item_id = bi.budget_item_id
+            where month(t.date) = month(curdate())
+            and t.budget_item_id is null
+            and b.month = month(curdate()) - 1`
+    );
+}
