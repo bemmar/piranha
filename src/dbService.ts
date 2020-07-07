@@ -48,8 +48,10 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
 }
 
 export async function deleteTransactions(transactionIds: string[]): Promise<void> {
-    await (await dbPool()).query({
-        sql: `DELETE ${DBTable.transaction}
+    const pool = await dbPool();
+
+    await pool.query({
+        sql: `DELETE FROM ${DBTable.transaction}
                WHERE source_transaction_id in (?)`,
         values: [transactionIds]
     });

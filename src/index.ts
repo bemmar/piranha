@@ -23,6 +23,7 @@ app.post("*", async (req, res) => {
             } else if (req.body.webhook_code === 'TRANSACTIONS_REMOVED') {
                 console.log('is transactions removed')
                 const { removed_transactions } = req.body;
+                console.log(removed_transactions);
                 await deleteTransactions(removed_transactions);
             }
         }
