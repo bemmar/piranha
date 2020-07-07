@@ -11,21 +11,26 @@ app.use(bodyParser.json());
 
 app.post("*", async (req, res) => {
     console.log(req.url, req.body);
+    try {
+        if (req.body.webhook_type === 'TRANSACTIONS') {
+            console.log("is transactions")
+            if (req.body.webhook_code === 'DEFAULT_UPDATE') {
+                console.log('is default update')
+                const transactions = await getTransactions();
+                await insertTransactions(transactions);
 
-
-    if (req.body.webook_type === 'TRANSACTIONS') {
-        if (req.body.webhook_code === 'DEFAULT_UPDATE') {
-            const transactions = await getTransactions();
-            await insertTransactions(transactions);
-
-            await runRules();
-        } else if (req.body.webhook_code === 'TRANSACTIONS_REMOVED') {
-            const { removed_transactions } = req.body;
-            await deleteTransactions(removed_transactions);
+                await runRules();
+            } else if (req.body.webhook_code === 'TRANSACTIONS_REMOVED') {
+                console.log('is transactions removed')
+                const { removed_transactions } = req.body;
+                await deleteTransactions(removed_transactions);
+            }
         }
-    }
 
-    res.sendStatus(200);
+        res.sendStatus(200);
+    } catch (error) {
+        res.status(500).json(error);
+    }
 });
 
 app.listen(process.env.PORT);

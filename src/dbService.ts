@@ -1,7 +1,9 @@
 import { DBTable, ITransactionPreInsertED } from '@bjemo/budget-utils';
+import { RowDataPacket } from 'mysql2';
 import dbPool from './dbPool';
 
 export async function insertTransactions(transactions: ITransactionPreInsertED[]): Promise<void> {
+    console.log('transactions.length', transactions.length);
     const allTransIds: string[] = transactions.map((transaction) => transaction.source_transaction_id);
 
     const [dbExistingIdRows] = await (await dbPool())
@@ -11,13 +13,18 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
             [allTransIds]
         );
 
+    console.log('dbExistingIdRows.length', (dbExistingIdRows as RowDataPacket[]).length);
+
     const now = new Date();
 
     const transactionsToInsert: any[] = transactions
-        .filter((transaction) => !(dbExistingIdRows as any[] as string[]).includes(transaction.source_transaction_id))
+        .filter((transaction) => (dbExistingIdRows as RowDataPacket[]).every((existing) =>
+            existing.source_transaction_id !== transaction.source_transaction_id))
         .map((transaction) => {
             return [transaction.name, transaction.amount, transaction.date, transaction.source_transaction_id, transaction.transaction_type, transaction.account_id, now, now, transaction.source_pending_transaction_id, transaction.source_pending];
         });
+
+    console.log('transactionsToInsert.length', transactionsToInsert.length)
 
     if (transactionsToInsert.length > 0) {
         await (await dbPool()).query({

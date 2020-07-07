@@ -1,4 +1,4 @@
-import { ITransactionPreInsertED, ServiceResponse, TransactionType } from '@bjemo/budget-utils';
+import { ITransactionPreInsertED, TransactionType } from '@bjemo/budget-utils';
 import { addDays } from 'date-fns';
 import { Client as PlaidClient, environments, Transaction, TransactionsResponse } from 'plaid';
 
@@ -29,7 +29,7 @@ export async function getTransactions(): Promise<ITransactionPreInsertED[]> {
         .map((accessToken: string) =>
             plaidClient.getTransactions(
                 accessToken,
-                addDays(new Date(), -30)
+                addDays(new Date(), -4)
                     .toISOString()
                     .slice(0, 10),
                 addDays(new Date(), 2)
