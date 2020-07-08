@@ -8,7 +8,7 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
 
     const [dbExistingIdRows] = await (await dbPool())
         .query(`SELECT source_transaction_id
-                      FROM ${DBTable.transaction}
+                      FROM ${DBTable.transaction_no_del}
                      WHERE source_transaction_id in (?)`,
             [allTransIds]
         );
@@ -51,7 +51,8 @@ export async function deleteTransactions(transactionIds: string[]): Promise<void
     const pool = await dbPool();
 
     await pool.query({
-        sql: `DELETE FROM ${DBTable.transaction}
+        sql: `UPDATE ${DBTable.transaction}
+                 SET is_deleted = 1
                WHERE source_transaction_id in (?)`,
         values: [transactionIds]
     });
