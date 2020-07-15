@@ -1,5 +1,5 @@
 import { DBTable, ITransactionPreInsertED } from '@bjemo/budget-utils';
-import { RowDataPacket } from 'mysql2';
+import { RowDataPacket, format } from 'mysql2';
 import dbPool from './dbPool';
 
 export async function insertTransactions(transactions: ITransactionPreInsertED[]): Promise<void> {
@@ -8,7 +8,7 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
 
     const [dbExistingIdRows] = await (await dbPool())
         .query(`SELECT source_transaction_id
-                      FROM ${DBTable.transaction_no_del}
+                      FROM ${DBTable.transaction}
                      WHERE source_transaction_id in (?)`,
             [allTransIds]
         );
@@ -24,10 +24,17 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
             return [transaction.name, transaction.amount, transaction.date, transaction.source_transaction_id, transaction.transaction_type, transaction.account_id, now, now, transaction.source_pending_transaction_id, transaction.source_pending];
         });
 
-    console.log('transactionsToInsert.length', transactionsToInsert.length)
+    console.log('transactionsToInsert.length', transactionsToInsert.length);
+
+    const transactionsToUpdate: any[] = transactions
+        .filter((transaction) => (dbExistingIdRows as RowDataPacket[]).some((existing) =>
+            existing.source_transaction_id === transaction.source_transaction_id))
+        .map((transaction) => {
+            return [transaction.name, transaction.amount, transaction.date, transaction.source_transaction_id, transaction.transaction_type, transaction.account_id, now, now, transaction.source_pending_transaction_id, transaction.source_pending];
+        });
 
     if (transactionsToInsert.length > 0) {
-        await (await dbPool()).query({
+        const result = await (await dbPool()).query({
             sql: `INSERT INTO ${DBTable.transaction}
                         (
                             name,
@@ -44,7 +51,45 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
                       VALUES ?`,
             values: [transactionsToInsert]
         });
+
+        console.log(JSON.stringify(result, null, 2));
     }
+
+    console.log('transactionsToUpdate.length', transactionsToUpdate.length);
+
+    if (transactionsToUpdate.length > 0) {
+        await (await dbPool()).query(buildTransactionUpdate(transactionsToUpdate));
+    }
+}
+
+function buildTransactionUpdate(transactions: ITransactionPreInsertED[]): string {
+    let queryArray: string[] = [];
+
+    transactions.forEach((transaction) => {
+        queryArray.push(
+            format(`UPDATE ${DBTable.transaction}
+                       SET name = ?,
+                           amount = ?,
+                           date = ?,
+                           transaction_type = ?,
+                           account_id = ?,
+                           updated_at = curdate(),
+                           is_deleted = 0,
+                           source_pending = ?,
+                           source_pending_transaction_id = ?
+                     WHERE source_transaction_id = ?`,
+                [transaction.name,
+                transaction.amount,
+                transaction.date,
+                transaction.transaction_type,
+                transaction.account_id,
+                transaction.source_pending,
+                transaction.source_pending_transaction_id,
+                transaction.source_transaction_id
+                ]));
+    });
+
+    return queryArray.join("; ");
 }
 
 export async function deleteTransactions(transactionIds: string[]): Promise<void> {

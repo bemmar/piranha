@@ -29,7 +29,7 @@ export async function getTransactions(): Promise<ITransactionPreInsertED[]> {
         .map((accessToken: string) =>
             plaidClient.getTransactions(
                 accessToken,
-                addDays(new Date(), -4)
+                addDays(new Date(), -18)
                     .toISOString()
                     .slice(0, 10),
                 addDays(new Date(), 2)
