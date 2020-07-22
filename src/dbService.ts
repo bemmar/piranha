@@ -2,18 +2,39 @@ import { DBTable, ITransactionPreInsertED } from '@bjemo/budget-utils';
 import { RowDataPacket, format } from 'mysql2';
 import dbPool from './dbPool';
 
-export async function insertTransactions(transactions: ITransactionPreInsertED[]): Promise<void> {
+export async function insertTransactions(transactions: (ITransactionPreInsertED & { budget_item_id?: number })[]): Promise<void> {
     console.log('transactions.length', transactions.length);
+    const pool = await dbPool();
     const allTransIds: string[] = transactions.map((transaction) => transaction.source_transaction_id);
+    const allPendingTransIds: string[] = transactions
+        .filter((transaction) => typeof transaction.source_pending_transaction_id === "string")
+        .map((transaction) => transaction.source_pending_transaction_id) as string[];
 
-    const [dbExistingIdRows] = await (await dbPool())
+    const [dbExistingIdRows] = await pool
         .query(`SELECT source_transaction_id
                       FROM ${DBTable.transaction}
                      WHERE source_transaction_id in (?)`,
             [allTransIds]
         );
 
+    const [dbExistingPendingRows] = await pool
+        .query(`SELECT source_transaction_id, budget_item_id
+                    FROM ${DBTable.transaction}
+                    WHERE source_transaction_id in (?)
+                      AND is_deleted = 0`,
+            [allPendingTransIds]
+        );
+
+    (dbExistingPendingRows as RowDataPacket[]).forEach((pendingRow) => {
+        const trans = transactions.find((t) => t.source_pending_transaction_id === pendingRow.source_transaction_id);
+
+        if (trans !== undefined) {
+            trans.budget_item_id = pendingRow.budget_item_id;
+        }
+    })
+
     console.log('dbExistingIdRows.length', (dbExistingIdRows as RowDataPacket[]).length);
+    console.log('dbExistingPendingRows.length', (dbExistingPendingRows as RowDataPacket[]).length);
 
     const now = new Date();
 
@@ -21,7 +42,18 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
         .filter((transaction) => (dbExistingIdRows as RowDataPacket[]).every((existing) =>
             existing.source_transaction_id !== transaction.source_transaction_id))
         .map((transaction) => {
-            return [transaction.name, transaction.amount, transaction.date, transaction.source_transaction_id, transaction.transaction_type, transaction.account_id, now, now, transaction.source_pending_transaction_id, transaction.source_pending];
+            return [
+                transaction.name,
+                transaction.amount,
+                transaction.date,
+                transaction.source_transaction_id,
+                transaction.transaction_type,
+                transaction.account_id,
+                now,
+                now,
+                transaction.source_pending_transaction_id,
+                transaction.source_pending,
+                transaction.budget_item_id ?? null];
         });
 
     console.log('transactionsToInsert.length', transactionsToInsert.length);
@@ -34,7 +66,7 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
         });
 
     if (transactionsToInsert.length > 0) {
-        const result = await (await dbPool()).query({
+        const result = await pool.query({
             sql: `INSERT INTO ${DBTable.transaction}
                         (
                             name,
@@ -46,7 +78,8 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
                             created_at,
                             updated_at,
                             source_pending_transaction_id,
-                            source_pending
+                            source_pending,
+                            budget_item_id
                         )
                       VALUES ?`,
             values: [transactionsToInsert]
@@ -58,7 +91,12 @@ export async function insertTransactions(transactions: ITransactionPreInsertED[]
     console.log('transactionsToUpdate.length', transactionsToUpdate.length);
 
     if (transactionsToUpdate.length > 0) {
-        await (await dbPool()).query(buildTransactionUpdate(transactionsToUpdate));
+        await pool.query(buildTransactionUpdate(transactionsToUpdate));
+    }
+
+    if ((dbExistingPendingRows as RowDataPacket[]).length > 0) {
+        await pool.query(buildPendingTransactionUpdate((dbExistingPendingRows as RowDataPacket[])
+            .map((r) => r.source_transaction_id)));
     }
 }
 
@@ -88,6 +126,25 @@ function buildTransactionUpdate(transactions: ITransactionPreInsertED[]): string
                 transaction.source_transaction_id
                 ]));
     });
+
+    return queryArray.join("; ");
+}
+
+function buildPendingTransactionUpdate(pendingTransactionIds: string[]): string {
+    let queryArray: string[] = [];
+
+    pendingTransactionIds.forEach((id) => {
+        queryArray.push(
+            format(`UPDATE ${DBTable.transaction}
+                       SET is_deleted = ?
+                     WHERE source_transaction_id = ?`,
+                [
+                    1,
+                    id
+                ]));
+    });
+
+    console.log(JSON.stringify(queryArray, null, 2));
 
     return queryArray.join("; ");
 }
