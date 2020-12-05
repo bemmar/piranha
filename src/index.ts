@@ -1,7 +1,7 @@
 import bodyParser from 'body-parser';
 import express, { Application } from 'express';
-import { getTransactions, setupClient } from './plaidService';
 import transactionCollection from './dbPool';
+import { getTransactions, setupClient } from './plaidService';
 
 setupClient();
 
@@ -42,5 +42,19 @@ app.post("*", async (req, res) => {
         res.status(500).json(error);
     }
 });
+
+// app.get('/incomeByYear/:year', async (req, res, _next) => {
+//     const year = parseInt(req.params.year as string);
+//     const income = await getIncomeByYear(year);
+
+//     res.json(income);
+// });
+
+// app.get('/incomeByQuarter/:year', async (req, res, _next) => {
+//     const year = parseInt(req.params.year as string);
+//     const income = await getIncomeByYear(year);
+
+//     res.json(income);
+// });
 
 app.listen(process.env.PORT);

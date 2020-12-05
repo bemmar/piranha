@@ -1,4 +1,3 @@
-import { ITransactionPreInsertED, TransactionType } from '@bjemo/budget-utils';
 import { addDays } from 'date-fns';
 import { Client as PlaidClient, environments, Transaction, TransactionsResponse } from 'plaid';
 
@@ -23,7 +22,11 @@ export function setupClient(): PlaidClient {
     return plaidClient;
 }
 
-export async function getTransactions(): Promise<Transaction[]> {
+export interface TransactionPlus extends Transaction {
+    fiscal_year: number; month: number; quarter: number;
+}
+
+export async function getTransactions(): Promise<TransactionPlus[]> {
     const transactionResponse: TransactionsResponse = await plaidClient.getTransactions(
         process.env.PLAID_ACCESS_TOKEN!,
         addDays(new Date(), -18)
@@ -37,5 +40,62 @@ export async function getTransactions(): Promise<Transaction[]> {
         }
     );
 
-    return transactionResponse.transactions.filter((t) => t.pending === false)
+    return transactionResponse.transactions
+        .filter((t) => t.pending === false)
+        .map((t) => {
+            const date = new Date(t.date);
+            const fiscal_year = date.getMonth() === 0 && date.getDate() < 15 ? date.getFullYear() - 1 : date.getFullYear();
+            let quarter = 1;
+
+            if (fiscal_year < date.getFullYear()) {
+                quarter = 4;
+            } else if ([0, 1, 2, 3].includes(date.getMonth())) {
+                if (date.getMonth() === 3) {
+                    if (date.getDate() < 15) {
+                        quarter = 1;
+                    } else {
+                        quarter = 2;
+                    }
+                } else {
+                    quarter = 1;
+                }
+            } else if ([3, 4, 5, 6].includes(date.getMonth())) {
+                if (date.getMonth() === 6) {
+                    if (date.getDate() < 15) {
+                        quarter = 2;
+                    } else {
+                        quarter = 3;
+                    }
+                } else {
+                    quarter = 2;
+                }
+            } else if ([6, 7, 8, 9].includes(date.getMonth())) {
+                if (date.getMonth() === 9) {
+                    if (date.getDate() < 15) {
+                        quarter = 3;
+                    } else {
+                        quarter = 4;
+                    }
+                } else {
+                    quarter = 3
+                }
+            } else if ([9, 10, 11, 0].includes(date.getMonth())) {
+                if (date.getMonth() === 0) {
+                    if (date.getDate() < 15) {
+                        quarter = 4;
+                    } else {
+                        quarter = 1;
+                    }
+                } else {
+                    quarter = 4
+                }
+            }
+
+            return {
+                ...t,
+                fiscal_year,
+                month: date.getMonth() + 1,
+                quarter
+            };
+        });
 }
