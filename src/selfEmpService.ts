@@ -19,7 +19,11 @@ enum Month {
 export async function getIncomeByYear(year: number, showTrans: boolean) {
   const collection = await transactionCollection();
 
-  const transactions = (await collection.find<TransactionPlus>().toArray())
+  const transactions = (
+    await collection
+      .find<TransactionPlus>({ account_id: { $eq: "8vAKqK6NL1HXM7wYamk6SjpEZeMnnYCyqbYgR" } })
+      .toArray()
+  )
     .filter((t: TransactionPlus) => {
       const date = new Date(t.date).getTime();
       const startOfTaxYear = Date.parse(`1/15/${year}`);
@@ -86,7 +90,11 @@ export async function getIncomeByYear(year: number, showTrans: boolean) {
 export async function getIncomeByQuarter(year: number, showTrans: boolean) {
   const collection = await transactionCollection();
 
-  const transactions = (await collection.find<TransactionPlus>().toArray())
+  const transactions = (
+    await collection
+      .find<TransactionPlus>({ account_id: { $eq: "8vAKqK6NL1HXM7wYamk6SjpEZeMnnYCyqbYgR" } })
+      .toArray()
+  )
     .filter((t: TransactionPlus) => {
       if (year !== undefined) {
         return new Date(t.date).getFullYear() === year;
